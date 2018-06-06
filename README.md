@@ -1,6 +1,6 @@
 # crypto
 Tarea de seguridad
 
-make compile //to compile proyect
-make jar //to create crypto.jar
-java -jar crypto.jar //to run
+make compile //to compile proyect <br/>
+make jar //to create crypto.jar <br/>
+java -jar crypto.jar //to run <br/>
