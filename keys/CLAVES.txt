@@ -1,0 +1,102 @@
+/////////Configuracion SSL///////////
+
+El siguiente instructivo presenta siete pasos para generar e instalar un certificado autofirmado.
+Se asume que apache esta instalado con el modulo ssl (mod_ssl); esto puede verificarse buscando la entrada 
+"LoadModule ssl_module" en el archivo apache2/sysconfig.d/loadmodule.conf 
+
+Asimismo se puede verificar que el modulo este cargado ejecutando el siguiente comando (y verificando la presencia del mudulo 
+en el listado generado por la salida estandar) : /usr/sbin/apache2ctl -t -D DUMP_MODULES
+
+En caso de que el modulo esta instalado pero no cargado, verificar el archivo /etc/sysconfig/apache
+Buscar la entrada APACHE_MODULES y agregar el texto "ssl" al string (reiniciar apache). 
+
+
+Se sugiere la creacion de un directorio de trabajo para generar los archivos
+
+mkdir ssl
+cd ssl
+
+
+
+
+1- Generar clave privada (server.key)++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+openssl genrsa -des3 -out server.key 1024
+
+Una vez ejecutado el comando se desplegara un formulario interactivo para el ingreso de la clave:
+
+Generating RSA private key, 1024 bit long modulus
+.........................................................++++++
+........++++++
+e is 65537 (0x10001)
+Enter PEM pass phrase:
+Verifying password - Enter PEM pass phrase:
+
+Una vez ingresada la frase se generara en el directorio atual el archivo server.key que contiene la clave privada.
+
+
+
+
+
+
+2- Generar CSR (Certificate Signing Request)+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+openssl req -new -key server.key -out server.csr
+
+Una vez ejecutado el comando se desplegara un formulario interactivo para el ingreso de los datos:
+
+Country Name (2 letter code) [AU]:UY
+State or Province Name (full name) [Some-State]:Montevideo
+Locality Name (eg, city) []:Montevideo
+Organization Name (eg, company) [Internet Widgits Pty Ltd]:Siateco
+Organizational Unit Name (eg, section) []:Sisteco
+Common Name (eg, YOUR name) []:Sisteco
+Email Address []:mail@domain.com
+
+Please enter the following 'extra' attributes
+to be sent with your certificate request
+A challenge password []:
+An optional company name []:
+
+
+Una vez ingresado se generara en el directorio atual el archivo server.csr que contiene la solicitud para firmado.
+
+
+
+
+
+
+
+3-Remover password +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Removemos la passphrase del archivo de la clave privada para evitar que apache nos pida escribir la clave cada vez que se 
+reinicia el servicio en modo seguro (startssl).
+
+cp server.key server.key.org
+openssl rsa -in server.key.org -out server.key 
+
+Al terminar el paso 3 deberiamos tener tres archivos en nuestro directorio de trabajo:
+
+-rw-r--r-- 1 root root 765 Nov 16 11:40 server.csr
+-rw-r--r-- 1 root root 887 Nov 16 11:41 server.key
+-rw-r--r-- 1 root root 963 Nov 16 11:41 server.key.org
+
+
+
+
+
+4-Generar certificado autofirmado +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+openssl x509 -req -days 365 -in server.csr -signkey server.key -out server.crt
+
+Despues de ejecutar el comando se generara en el directorio atual el archivo server.crt que es nuestro certificado autofirmado
+valido por un año. Modificar la cantidad de dias (parametro -days) para aumentar/disminuir la vida util del certificado.
+
+
+
+
+
+
+
+
+
+ 
