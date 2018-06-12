@@ -10,6 +10,9 @@ import java.security.KeyFactory;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import org.apache.commons.codec.binary.Base64;
+import javax.crypto.*;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 
 
 class Crypto
@@ -39,13 +42,15 @@ class Crypto
 
                                 	case("-v"):
 	                                case("verify"):Crypto.verify(args[1],args[2],args[3]);
-		
+					break;
+
                 	                case("-e"):
-                        	        case("encrypt"):Crypto.encrypt(args[1]);
+                        	        case("encrypt"):Crypto.encrypt(args[1],args[2]);
                                 	break;
 
 	                                case("-d"):
         	                        case("decrypt"):Crypto.decrypt(args[1],args[2]);
+					break;
 	
         	                        case("-h"):
                 	                case("--help"):
@@ -71,17 +76,16 @@ class Crypto
                         System.out.println("-r, register        			register new user");
                         System.out.println("-l, login           			user login");
 			System.out.println("-o, login           			user logout");
-                        System.out.println("-s, sign  	<privatekey,document> 		sign the input file");
+                        System.out.println("-s, sign  	<privatekey,document> 		sign the document");
                         System.out.println("-v, verify  <publickey,signature,document>	verify sign");
-                        System.out.println("-e, encrypt <>       			encript the input file");
-                        System.out.println("-d, decrypt <>        			decrypt the input file");
-
+                        System.out.println("-e, encrypt <symkey,document>		encript the document");
+                        System.out.println("-d, decrypt <symkey,document>		decrypt the document");
   	}
 	
 
 	public static void register() throws Exception
 	{
-
+		
 	}
 
 
@@ -127,12 +131,41 @@ class Crypto
 	}
 	
 
-	public static void encrypt(String file)
+	public static void encrypt(String fileKey, String file) throws Exception
 	{
+		byte[] document=Crypto.readFile(file);
+		byte[] key= Crypto.readFile(fileKey);
+		
+		SecretKey aeskey = new SecretKeySpec(key,"AES");
+
+		Cipher encryptCipher = Cipher.getInstance("AES");
+		encryptCipher.init(Cipher.ENCRYPT_MODE, aeskey);
+		
+		byte[] encryptedBytes = encryptCipher.doFinal(document);
+		String filename=file+".aes";
+		
+		Crypto.saveFile(filename,encryptedBytes);		
+
+		System.out.println("File "+filename+" encripted Ok.");
 	}
 
-	public static void decrypt(String synKey, String file)
+
+	public static void decrypt(String fileKey, String file) throws Exception
 	{
+		byte[] key= Crypto.readFile(fileKey);
+                byte[] cryptodoc=Crypto.readFile(file);
+
+		SecretKey aeskey = new SecretKeySpec(key,"AES");
+
+		Cipher decryptCipher = Cipher.getInstance("AES");
+    		decryptCipher.init(Cipher.DECRYPT_MODE, aeskey);
+				
+		byte[] document = decryptCipher.doFinal(cryptodoc); 
+
+		String filename=file.substring(0,file.lastIndexOf('.'));
+		Crypto.saveFile(filename,document);
+
+		System.out.println("File "+filename+" decripted Ok.");
 	}
 
 
