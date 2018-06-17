@@ -9,20 +9,17 @@ import java.security.Signature;
 import java.security.KeyFactory;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.MessageDigest;
 import org.apache.commons.codec.binary.Base64;
 import javax.crypto.*;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
-
 class Crypto
 {
-	public static void parse( String args[])
+	public static void parse( String args[]) throws Exception
   	{
                 
-		try
-		{
-		
 			if(args.length==0) Crypto.printHelp();
                 	else
                 	{
@@ -35,10 +32,18 @@ class Crypto
                 	                case("-l"):
                         	        case("login"):Crypto.login();
                                 	break;
-
-		                        case("-s"):
+					
+					case("-lci"):
+                                        case("loginci"):Crypto.loginCI();
+                                        break;
+		                        
+					case("-s"):
                 	                case("sign"):Crypto.sign(args[1],args[2]);
                         	        break;
+
+					case("-sci"):
+                                        case("signci"):Crypto.signCI(args[1]);
+                                        break;
 
                                 	case("-v"):
 	                                case("verify"):Crypto.verify(args[1],args[2],args[3]);
@@ -55,32 +60,39 @@ class Crypto
         	                        case("-h"):
                 	                case("--help"):
                         	        default: Crypto.printHelp(); 
-
 		
                 	        }
 
                 	}
-
-		}catch(Exception e)
-		{
-			e.printStackTrace();
-		}
 
 
   	}
 
 	public static void printHelp()
   	{
-                        System.out.println("Usage: java -jar crypt.jar [options][<input files>]");
+                        System.out.println("Usage: java -jar crypt.jar [options][<files>]");
                         System.out.println("Opptions:");
                         System.out.println("-r, register        			register new user");
                         System.out.println("-l, login           			user login");
+			System.out.println("-lci, loginci                               user login with ci");
 			System.out.println("-o, login           			user logout");
                         System.out.println("-s, sign  	<privatekey,document> 		sign the document");
+			System.out.println("-sci, signci<document>			sing the document with ci");
                         System.out.println("-v, verify  <publickey,signature,document>	verify sign");
                         System.out.println("-e, encrypt <symkey,document>		encript the document");
                         System.out.println("-d, decrypt <symkey,document>		decrypt the document");
   	}
+
+	
+	private static String readPin()
+	{
+	       Console console = System.console();
+               System.out.print("Ingrese PIN:");
+               char[] pinChars = console.readPassword();
+
+               return new String(pinChars);
+		
+	}
 	
 
 	public static void register() throws Exception
@@ -95,6 +107,37 @@ class Crypto
 	}	
 
 
+	public static void loginCI() throws Exception
+	{
+		
+		String PIN= Crypto.readPin();
+		if(!APDU.verifyPIN(PIN)) throw new Exception("Pin incorrecto");
+
+		//init session
+
+		System.out.println("Autenticacion completa");
+		
+	}
+
+	
+	public static void signCI(String file) throws Exception
+	{
+		String PIN = Crypto.readPin();
+		if(!APDU.verifyPIN(PIN)) throw new Exception("Pin incorrecto");
+
+                byte[] document= Crypto.readFile(file);
+                MessageDigest md = MessageDigest.getInstance("SHA-256");
+                String hash = new String(md.digest(document));
+
+		String sign =  APDU.sign(hash);
+
+		String signame=file+".sgn";
+                Crypto.saveFile(signame,sign.getBytes());
+
+		System.out.println("Firma "+signame+" generada exitosamente");
+	}	
+
+
 
 	public static void sign(String fileKey,String file) throws Exception
 	{
@@ -105,11 +148,10 @@ class Crypto
 		signature.initSign(privada);
 		signature.update(document);
 		
-		String signame=file.substring(0,file.lastIndexOf('.'))+".sign";
+		String signame=file+".sgn";
 
 		Crypto.saveFile(signame,signature.sign());		 	
-
-		System.out.println("Archivo firmado ok!!");
+		System.out.println("Firma "+signame+" generada exitosamente");
 	}
 	
 
@@ -200,5 +242,6 @@ class Crypto
                 KeyFactory kf = KeyFactory.getInstance("RSA");
                 return kf.generatePublic(spec);
 	}
+
 		
 }
