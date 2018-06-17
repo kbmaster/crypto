@@ -14,6 +14,7 @@ import org.apache.commons.codec.binary.Base64;
 import javax.crypto.*;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import java.util.Scanner;
 
 class Crypto
 {
@@ -28,6 +29,10 @@ class Crypto
                                 	case("-r"):
 	                                case("register"):Crypto.register();
         	                        break;
+
+					case("-o"):
+                                        case("logout"):Crypto.logout();
+                                        break;
 
                 	                case("-l"):
                         	        case("login"):Crypto.login();
@@ -68,14 +73,14 @@ class Crypto
 
   	}
 
-	public static void printHelp()
+	private static void printHelp()
   	{
                         System.out.println("Usage: java -jar crypt.jar [options][<files>]");
                         System.out.println("Opptions:");
                         System.out.println("-r, register        			register new user");
                         System.out.println("-l, login           			user login");
 			System.out.println("-lci, loginci                               user login with ci");
-			System.out.println("-o, login           			user logout");
+			System.out.println("-o, logout           			user logout");
                         System.out.println("-s, sign  	<privatekey,document> 		sign the document");
 			System.out.println("-sci, signci<document>			sing the document with ci");
                         System.out.println("-v, verify  <publickey,signature,document>	verify sign");
@@ -84,44 +89,72 @@ class Crypto
   	}
 
 	
-	private static String readPin()
-	{
-	       Console console = System.console();
-               System.out.print("Ingrese PIN:");
-               char[] pinChars = console.readPassword();
 
-               return new String(pinChars);
+	private static void register() throws Exception
+	{
+                Scanner inputScanner = new Scanner(System.in);
+                System.out.print("Usuario: ");
+                String user=inputScanner.next();
+
+                System.out.print("Password:");
+                String passwd= Crypto.readPin();
+
+                System.out.print("Repetir Password:");
+                String passwd2= Crypto.readPin();
+
+		if(!passwd.equals(passwd2)) throw new Exception("Los passwords no coinciden");
+		
+		//check owned passwords
+		if(Account.owned(passwd)) throw new Exception("Password expuesto");
+				
+		if(!Account.register(user,passwd)) throw new Exception("Error en registro");
+		
+		System.out.println("Registro exitoso");
 		
 	}
-	
 
-	public static void register() throws Exception
+	private static void logout() throws Exception
 	{
-		
-	}
+		if(!Account.logout()) throw new Exception("Error al finalizar sesion");
+		System.out.println("Sesion finalizada correctamente");
 
-
-	public static void login()
-	{
-	
 	}	
 
 
-	public static void loginCI() throws Exception
+	private static void login() throws Exception 
 	{
+		Scanner inputScanner = new Scanner(System.in);
+                System.out.print("Usuario: ");
+                String user=inputScanner.next();
+
+                System.out.print("Password:");
+                String passwd= Crypto.readPin();
+
+		if(!Account.login(user,passwd)) throw new Exception("Credenciales invalidas");
 		
+		System.out.println("Autenticacion completa");
+			
+	}	
+
+
+	private static void loginCI() throws Exception
+	{
+		System.out.print("Ingrese PIN:");
 		String PIN= Crypto.readPin();
 		if(!APDU.verifyPIN(PIN)) throw new Exception("Pin incorrecto");
 
 		//init session
-
+		Account.sessionStart();
 		System.out.println("Autenticacion completa");
 		
 	}
 
 	
-	public static void signCI(String file) throws Exception
-	{
+	private static void signCI(String file) throws Exception
+	{		
+		Crypto.checkSession();		
+
+		System.out.print("Ingrese PIN:");
 		String PIN = Crypto.readPin();
 		if(!APDU.verifyPIN(PIN)) throw new Exception("Pin incorrecto");
 
@@ -139,8 +172,10 @@ class Crypto
 
 
 
-	public static void sign(String fileKey,String file) throws Exception
+	private  static void sign(String fileKey,String file) throws Exception
 	{
+		Crypto.checkSession();		
+
 		PrivateKey privada=Crypto.getPrivateKey(fileKey);
 		byte[] document= Crypto.readFile(file);
 
@@ -155,9 +190,10 @@ class Crypto
 	}
 	
 
-	public static void verify(String fileKey, String fileSign, String file) throws Exception
+	private static void verify(String fileKey, String fileSign, String file) throws Exception
 	{
-		
+		Crypto.checkSession();		
+
 		PublicKey publica=Crypto.getPublicKey(fileKey);
 		byte[] document = Crypto.readFile(file);
 		byte[] signature= Crypto.readFile(fileSign); 
@@ -173,8 +209,10 @@ class Crypto
 	}
 	
 
-	public static void encrypt(String fileKey, String file) throws Exception
+	private static void encrypt(String fileKey, String file) throws Exception
 	{
+		Crypto.checkSession();
+
 		byte[] document=Crypto.readFile(file);
 		byte[] key= Crypto.readFile(fileKey);
 		
@@ -192,8 +230,10 @@ class Crypto
 	}
 
 
-	public static void decrypt(String fileKey, String file) throws Exception
+	private static void decrypt(String fileKey, String file) throws Exception
 	{
+		Crypto.checkSession();
+
 		byte[] key= Crypto.readFile(fileKey);
                 byte[] cryptodoc=Crypto.readFile(file);
 
@@ -243,5 +283,17 @@ class Crypto
                 return kf.generatePublic(spec);
 	}
 
-		
+	 private static String readPin()
+        {
+               Console console = System.console();
+               char[] pinChars = console.readPassword();
+
+               return new String(pinChars);
+
+        }
+
+        private static  void checkSession() throws Exception
+        {
+                if(!Account.checkSession()) throw new Exception("Login requerido");
+        }		
 }
