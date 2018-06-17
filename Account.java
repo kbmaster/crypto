@@ -31,8 +31,9 @@ class Account
 
 	}
 
-	public static boolean  owned(String passwd)
+	public static boolean  owned(String passwd) throws Exception
 	{
-		retun false;
+		
+		return false;
 	} 	
 }

@@ -10,11 +10,19 @@ import java.security.KeyFactory;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.MessageDigest;
+import java.security.cert.CertificateFactory;
 import org.apache.commons.codec.binary.Base64;
 import javax.crypto.*;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.util.Scanner;
+
+import java.security.cert.X509Certificate;
+import javax.security.auth.x500.X500Principal;
+import java.security.KeyPairGenerator;
+import java.util.Date;
+import java.security.SecureRandom;
+import java.security.KeyPair;
 
 class Crypto
 {
@@ -51,7 +59,7 @@ class Crypto
                                         break;
 
                                 	case("-v"):
-	                                case("verify"):Crypto.verify(args[1],args[2],args[3]);
+	                                case("verify"):Crypto.verifyCI(args[1],args[2],args[3]);
 					break;
 
                 	                case("-e"):
@@ -60,6 +68,10 @@ class Crypto
 
 	                                case("-d"):
         	                        case("decrypt"):Crypto.decrypt(args[1],args[2]);
+					break;
+
+					case("-crt"):
+					case("certificate"):Crypto.getCertificate();
 					break;
 	
         	                        case("-h"):
@@ -86,6 +98,7 @@ class Crypto
                         System.out.println("-v, verify  <publickey,signature,document>	verify sign");
                         System.out.println("-e, encrypt <symkey,document>		encript the document");
                         System.out.println("-d, decrypt <symkey,document>		decrypt the document");
+			System.out.println("-crt, certificate 		                get the certificate");
   	}
 
 	
@@ -110,14 +123,12 @@ class Crypto
 		if(!Account.register(user,passwd)) throw new Exception("Error en registro");
 		
 		System.out.println("Registro exitoso");
-		
 	}
 
 	private static void logout() throws Exception
 	{
 		if(!Account.logout()) throw new Exception("Error al finalizar sesion");
 		System.out.println("Sesion finalizada correctamente");
-
 	}	
 
 
@@ -160,12 +171,12 @@ class Crypto
 
                 byte[] document= Crypto.readFile(file);
                 MessageDigest md = MessageDigest.getInstance("SHA-256");
-                String hash = new String(md.digest(document));
+                String hash = APDU.byteArrayToHex(md.digest(document));
 
 		String sign =  APDU.sign(hash);
-
+		
 		String signame=file+".sgn";
-                Crypto.saveFile(signame,sign.getBytes());
+                Crypto.saveFile(signame, APDU.hexStringToByteArray(sign));
 
 		System.out.println("Firma "+signame+" generada exitosamente");
 	}	
@@ -189,6 +200,42 @@ class Crypto
 		System.out.println("Firma "+signame+" generada exitosamente");
 	}
 	
+	
+	private static void verifyCI(String fileKey, String fileSign, String file) throws Exception
+	{
+                Crypto.checkSession();
+
+                System.out.print("Ingrese PIN:");
+                String PIN = Crypto.readPin();
+                if(!APDU.verifyPIN(PIN)) throw new Exception("Pin incorrecto");	
+
+		byte[] document = Crypto.readFile(file);
+                byte[] signature= Crypto.readFile(fileSign);		
+		
+		//obtener la clave publica del certificado
+		CertificateFactory cf = CertificateFactory.getInstance("X.509");
+		InputStream certificado_b64 = new ByteArrayInputStream(APDU.hexStringToByteArray(APDU.getCertificate()));
+		X509Certificate certificado = (X509Certificate) cf.generateCertificate(certificado_b64);
+		PublicKey publica=certificado.getPublicKey();
+ 
+		//desencripto la firma
+		Cipher decrypt = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+		decrypt.init(Cipher.DECRYPT_MODE, publica);
+		String decryptedMessage = APDU.byteArrayToHex(decrypt.doFinal(signature));		
+
+		//calculo el hash del documento
+		MessageDigest md = MessageDigest.getInstance("SHA-256");
+                String hash = APDU.byteArrayToHex(md.digest(document));
+
+		if(decryptedMessage.equals(hash))
+                System.out.println("Verification OK");
+                else
+                System.out.println("Verification Failed");
+
+
+	}
+
+
 
 	private static void verify(String fileKey, String fileSign, String file) throws Exception
 	{
@@ -251,8 +298,14 @@ class Crypto
 	}
 
 
-	//////////////////////////////////////////////////////////////////////
+	private static void getCertificate() throws Exception
+	{
+		String cert= APDU.getCertificate();
+                Crypto.saveFile("Certificado.crt",cert.getBytes());		
 
+	}
+
+	//////////////////////////////////////////////////////////////////////
 
 	private static byte[] readFile(String filename) throws Exception
 	{
