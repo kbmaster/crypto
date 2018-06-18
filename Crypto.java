@@ -63,11 +63,11 @@ class Crypto
 					break;
 
                 	                case("-e"):
-                        	        case("encrypt"):Crypto.encrypt(args[1],args[2]);
+                        	        case("encrypt"):Crypto.encrypt(args[1]);
                                 	break;
 
 	                                case("-d"):
-        	                        case("decrypt"):Crypto.decrypt(args[1],args[2]);
+        	                        case("decrypt"):Crypto.decrypt(args[1]);
 					break;
 
 					case("-crt"):
@@ -87,7 +87,8 @@ class Crypto
 
 	private static void printHelp()
   	{
-                        System.out.println("Usage: java -jar crypt.jar [options][<files>]");
+			
+			System.out.println("Usage: java -jar crypt.jar [options][<files>]");
                         System.out.println("Opptions:");
                         System.out.println("-r, register        			register new user");
                         System.out.println("-l, login           			user login");
@@ -96,8 +97,8 @@ class Crypto
                         System.out.println("-s, sign  	<privatekey,document> 		sign the document");
 			System.out.println("-sci, signci<document>			sing the document with ci");
                         System.out.println("-v, verify  <publickey,signature,document>	verify sign");
-                        System.out.println("-e, encrypt <symkey,document>		encript the document");
-                        System.out.println("-d, decrypt <symkey,document>		decrypt the document");
+                        System.out.println("-e, encrypt <document>			encript the document");
+                        System.out.println("-d, decrypt <document>			decrypt the document");
 			System.out.println("-crt, certificate 		                get the certificate");
   	}
 
@@ -109,16 +110,11 @@ class Crypto
                 System.out.print("Usuario: ");
                 String user=inputScanner.next();
 
-                System.out.print("Password:");
-                String passwd= Crypto.readPin();
-
-                System.out.print("Repetir Password:");
-                String passwd2= Crypto.readPin();
-
-		if(!passwd.equals(passwd2)) throw new Exception("Los passwords no coinciden");
+                //solicito ingreso de password con confirmacion
+                String passwd=Crypto.confirmPassword();
 		
 		//check owned passwords
-		if(Account.owned(passwd)) throw new Exception("Password expuesto");
+		if(Account.owned(passwd)) throw new Exception("Tu password no es muy seguro; has un mejor intento ;)");
 				
 		if(!Account.register(user,passwd)) throw new Exception("Error en registro");
 		
@@ -231,8 +227,6 @@ class Crypto
                 System.out.println("Verification OK");
                 else
                 System.out.println("Verification Failed");
-
-
 	}
 
 
@@ -256,46 +250,61 @@ class Crypto
 	}
 	
 
-	private static void encrypt(String fileKey, String file) throws Exception
-	{
-		Crypto.checkSession();
+	private static void encrypt(String file) throws Exception
+        {
+                Crypto.checkSession();
+                
+		//solicito ingreso de password con confirmacion
+		String passwd=Crypto.confirmPassword();
 
-		byte[] document=Crypto.readFile(file);
-		byte[] key= Crypto.readFile(fileKey);
+                byte[] document=Crypto.readFile(file);
+
+		SecretKey aeskey = Keys.genAES();
 		
-		SecretKey aeskey = new SecretKeySpec(key,"AES");
-
 		Cipher encryptCipher = Cipher.getInstance("AES");
-		encryptCipher.init(Cipher.ENCRYPT_MODE, aeskey);
+                encryptCipher.init(Cipher.ENCRYPT_MODE, aeskey);
+
+                byte[] encryptedBytes = encryptCipher.doFinal(document);
+                String filename=file+".aes";
+
+		//save to keystore
+		MessageDigest dg = MessageDigest.getInstance("SHA-256");
+		String alias= new String(dg.digest(encryptedBytes));
+		Keys.save(alias,aeskey,passwd);
 		
-		byte[] encryptedBytes = encryptCipher.doFinal(document);
-		String filename=file+".aes";
-		
-		Crypto.saveFile(filename,encryptedBytes);		
-
-		System.out.println("File "+filename+" encripted Ok.");
-	}
+                Crypto.saveFile(filename,encryptedBytes);
+                System.out.println("File "+filename+" encripted Ok.");
+        }
 
 
-	private static void decrypt(String fileKey, String file) throws Exception
-	{
-		Crypto.checkSession();
+        private static void decrypt(String file) throws Exception
+        {
+                Crypto.checkSession();
+		//solicito ingreso de password con confirmacion
+                String passwd=Crypto.confirmPassword();
 
-		byte[] key= Crypto.readFile(fileKey);
                 byte[] cryptodoc=Crypto.readFile(file);
 
-		SecretKey aeskey = new SecretKeySpec(key,"AES");
+		//read from keystore
+		//save to keystore
+                MessageDigest dg = MessageDigest.getInstance("SHA-256");
+                String alias= new String(dg.digest(cryptodoc));
+                SecretKey aeskey = Keys.read(alias,passwd);
 
-		Cipher decryptCipher = Cipher.getInstance("AES");
-    		decryptCipher.init(Cipher.DECRYPT_MODE, aeskey);
-				
-		byte[] document = decryptCipher.doFinal(cryptodoc); 
+                Cipher decryptCipher = Cipher.getInstance("AES");
+                decryptCipher.init(Cipher.DECRYPT_MODE, aeskey);
 
-		String filename=file.substring(0,file.lastIndexOf('.'));
-		Crypto.saveFile(filename,document);
+                byte[] document = decryptCipher.doFinal(cryptodoc);
 
-		System.out.println("File "+filename+" decripted Ok.");
-	}
+                String filename=file.substring(0,file.lastIndexOf('.'));
+                Crypto.saveFile(filename,document);
+
+                System.out.println("File "+filename+" decripted Ok.");
+        }
+
+
+
+
 
 
 	private static void getCertificate() throws Exception
@@ -344,6 +353,20 @@ class Crypto
                return new String(pinChars);
 
         }
+
+	private static String confirmPassword() throws Exception
+	{
+		System.out.print("Password:");
+                String passwd= Crypto.readPin();
+
+                System.out.print("Repetir Password:");
+                String passwd2= Crypto.readPin();
+
+                if(!passwd.equals(passwd2)) throw new Exception("Los passwords no coinciden");
+
+		return passwd; 
+	}
+
 
         private static  void checkSession() throws Exception
         {
