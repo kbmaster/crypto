@@ -3,7 +3,7 @@ JFLAGS=-g
 JAVA=java
 JAVAC=javac
 
-JARS = -cp "./libs/org-apache-commons-codec.jar"
+JARS = -cp "./libs/bcprov-jdk15on-159.jar"
 JAR=jar
 
 

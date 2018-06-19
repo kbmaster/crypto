@@ -15,7 +15,8 @@ import java.sql.Statement;
 
 class Account
 {	
-
+	private static String __uid="";
+	
 	public static boolean register(String username,String password)
 	{
 		/*String hashPass=Account.hashPass(password);
@@ -25,6 +26,8 @@ class Account
             	st.execute(sqlInsertUser);
 		con.close();
 		*/
+		
+		Account.__uid="1";
 		return true;
 	}
 
@@ -66,6 +69,13 @@ class Account
 
 		return true;
 	}
+
+	
+	public  static String getID()
+	{
+		return Account.__uid;
+	}
+
 
 	public static boolean sessionStart()
 	{

@@ -11,7 +11,7 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.MessageDigest;
 import java.security.cert.CertificateFactory;
-import org.apache.commons.codec.binary.Base64;
+//import org.apache.commons.codec.binary.Base64;
 import javax.crypto.*;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
@@ -85,9 +85,8 @@ class Crypto
 
   	}
 
-	private static void printHelp()
+	private static void printHelp() throws Exception
   	{
-			
 			System.out.println("Usage: java -jar crypt.jar [options][<files>]");
                         System.out.println("Opptions:");
                         System.out.println("-r, register        			register new user");
@@ -117,6 +116,10 @@ class Crypto
 		if(Account.owned(passwd)) throw new Exception("Tu password no es muy seguro; has un mejor intento ;)");
 				
 		if(!Account.register(user,passwd)) throw new Exception("Error en registro");
+		
+		String UID=Account.getID();
+		
+		Keys.genPKI(UID,passwd);
 		
 		System.out.println("Registro exitoso");
 	}
