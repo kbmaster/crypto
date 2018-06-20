@@ -1,3 +1,5 @@
+import java.util.*;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -24,6 +26,11 @@ import java.sql.PreparedStatement;
 class Account
 {	
 	private static String __uid="";
+	private static String __dbhost;	
+	private static String __dbname;
+	private static String __dbuser;
+	private static String __dbpasswd;
+	private static String __sessiondir="./";
 	
 	public static boolean register(String username,String password) throws Exception
 	{
@@ -74,13 +81,41 @@ class Account
 
 	}
 
+
+	 public static boolean preSessionLogin(String token) throws Exception
+         {
+
+                String presession=Account.hashPass(token);
+                String sqlLogin = "SELECT UserID from PreSessions where SessionToken=?";
+                Connection con = Account.getConnection();
+
+                PreparedStatement ps = con.prepareStatement(sqlLogin);
+                ps.setString(1,presession);
+
+                ResultSet rs = ps.executeQuery();
+
+                if(rs.next())
+                {
+                         Account.__uid=rs.getString("UserID");
+                         con.close();
+                         Account.deleteSessions();
+
+                         if(!Account.sessionStart())throw new Exception("Error aliniciar sesion");
+                         return true;
+                }
+                else return false;
+
+        }
+	
+
+
 	public static boolean logout()
 	{
 		
 		try
                 {
 			Account.deleteSessions();			
-			File session = new File("session");
+			File session = new File(Account.__sessiondir+"crypto.session");
 			session.delete();
 
 			return true;
@@ -97,7 +132,7 @@ class Account
 				
 		try
 		{
-			String session= new String(Files.readAllBytes(new File("session").toPath()));
+			String session= new String(Files.readAllBytes(new File(Account.__sessiondir+"crypto.session").toPath()));
 		
 			String sqlCheck = "SELECT UserID from Sessions where SessionID=?";
                 	Connection con = Account.getConnection();
@@ -147,7 +182,7 @@ class Account
                 	ps.executeUpdate();
 	                con.close();
 			
-			OutputStream out = new FileOutputStream(new File("session"));
+			OutputStream out = new FileOutputStream(new File(Account.__sessiondir+"crypto.session"));
 			out.write(session.getBytes());
 			out.close();
 
@@ -155,14 +190,41 @@ class Account
 
 		}catch(Exception e)
 		{
-			e.printStackTrace();
 			Account.logout();
 			return false;
 		}
 	}
 
+
+	public static boolean vincular(String sign)
+	{
+		try
+		{
+			String presession=Account.hashPass(sign);
+			String sqlInsertPreSession = "INSERT INTO PreSessions (UserID, SessionToken) values (?,?);";
+                        Connection con = Account.getConnection();
+                        PreparedStatement ps = con.prepareStatement(sqlInsertPreSession);
+                        ps.setString(1,Account.__uid);
+                        ps.setString(2,presession);
+
+			ps.executeUpdate();
+                        con.close();
+
+			return true;
+	
+				
+		}catch(Exception e)
+		{
+			return false;			
+		}
+
+
+	}
+
+
 	public static boolean  owned(String passwd) throws Exception
 	{
+		System.out.println("Verificando password...");
 		String phash = Account.hashPass(passwd);
 		String hash= phash.substring(0,5);
 		String suffixHash = phash.substring(5).toUpperCase();		
@@ -207,11 +269,24 @@ class Account
 
 	private static Connection getConnection() throws Exception
 	{
+		Account.loadConf();
 		Class.forName("com.mysql.jdbc.Driver");
-		Connection connection = DriverManager.getConnection("jdbc:mysql://localhost/CRYPTO?user=crypto&password=password");
+		Connection connection =DriverManager.getConnection("jdbc:mysql://"+Account.__dbhost+"/"+Account.__dbname+"?user="+Account.__dbuser+"&password="+Account.__dbpasswd);
 		if(connection==null) throw new Exception("Error de  conexion");
 		return connection;
 	}
+	
+	 private static void loadConf() throws Exception
+        {
+                 Properties p = new Properties();
+                 p.load(new FileInputStream("crypto.ini"));
+                 Account.__dbhost=p.getProperty("dbhost");
+		 Account.__dbname=p.getProperty("dbname");
+		 Account.__dbuser=p.getProperty("dbuser");
+		 Account.__dbpasswd=p.getProperty("dbpassword");
+		 Account.__sessiondir=p.getProperty("sessiondir");
+        }
+
 
 	private static void deleteSessions() throws Exception
 	{

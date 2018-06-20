@@ -48,6 +48,10 @@ class Crypto
 					case("-lci"):
                                         case("loginci"):Crypto.loginCI();
                                         break;
+
+					case("-vci"):
+                                        case("vincular"):Crypto.vincularCI();
+                                        break;
 		                        
 					case("-s"):
                 	                case("sign"):Crypto.sign(args[1]);
@@ -86,6 +90,7 @@ class Crypto
                         System.out.println("Opptions:");
                         System.out.println("-r,register                                 registrar nuevo usuario");
                         System.out.println("-l,login                                    login de usuario");
+			System.out.println("-vci,vincular                               vincular cedula");
 			System.out.println("-lci,loginci                                login con cedula");
 			System.out.println("-o,logout                                   logout de usuario");
                         
@@ -151,9 +156,13 @@ class Crypto
 		System.out.print("Ingrese PIN:");
 		String PIN= Crypto.readPin();
 		if(!APDU.verifyPIN(PIN)) throw new Exception("Pin incorrecto");
+		
+		MessageDigest md = MessageDigest.getInstance("SHA-256");
+                String hash = APDU.byteArrayToHex(md.digest(PIN.getBytes()));
 
-		//init session
-		//Account.sessionStart();
+                String token  =  APDU.sign(hash);
+		
+		if(!Account.preSessionLogin(token))throw new Exception("No fue posible iniciar sesion");
 		System.out.println("Autenticacion completa");
 		
 	}
@@ -213,18 +222,20 @@ class Crypto
 
 	private static void verifyCI(String fileKey, String fileSign, String file) throws Exception
 	{
-                Crypto.checkSession();
+                //Crypto.checkSession();
 
-                System.out.print("Ingrese PIN:");
-                String PIN = Crypto.readPin();
-                if(!APDU.verifyPIN(PIN)) throw new Exception("Pin incorrecto");	
+                //System.out.print("Ingrese PIN:");
+                //String PIN = Crypto.readPin();
+                //if(!APDU.verifyPIN(PIN)) throw new Exception("Pin incorrecto");	
 
 		byte[] document = Crypto.readFile(file);
                 byte[] signature= Crypto.readFile(fileSign);		
+		byte[] certificate = Crypto.readFile(fileKey);
 		
 		//obtener la clave publica del certificado
 		CertificateFactory cf = CertificateFactory.getInstance("X.509");
-		InputStream certificado_b64 = new ByteArrayInputStream(APDU.hexStringToByteArray(APDU.getCertificate()));
+		//InputStream certificado_b64 = new ByteArrayInputStream(APDU.hexStringToByteArray(APDU.getCertificate()));
+		InputStream certificado_b64 = new ByteArrayInputStream(APDU.hexStringToByteArray(new String(certificate)));
 		X509Certificate certificado = (X509Certificate) cf.generateCertificate(certificado_b64);
 		PublicKey publica=certificado.getPublicKey();
  
@@ -238,14 +249,14 @@ class Crypto
                 String hash = APDU.byteArrayToHex(md.digest(document));
 
 		if(decryptedMessage.equals(hash))
-                System.out.println("Verification OK");
+                System.out.println("Verificacion OK");
                 else
-                System.out.println("Verification Failed");
+                System.out.println("Fallo en verificacion");
 	}
 
 
 
-	private static void verify(String fileKey, String fileSign, String file) throws Exception
+	private static void verifyMine(String fileKey, String fileSign, String file) throws Exception
 	{
 
 		PublicKey publica=Crypto.getPublicKey(fileKey);
@@ -261,12 +272,44 @@ class Crypto
 		else
 		System.out.println("Fallo en verificacion");
 	}
+
+
+	private static void  verify(String fileKey, String fileSign, String file) throws Exception
+	{
+		//Dado que no pudimos validar los certificados autogenerados
+		//de la misma forma que lo de la CI usamos funciones diferentes 
+		//dependiendo de cual sea
+		
+		File f =new File(fileKey);
+		if(f.length()<3000)Crypto.verifyMine(fileKey,fileSign,file);
+		else Crypto.verifyCI(fileKey,fileSign,file);
+
+	}
+
+	private static void vincularCI() throws Exception
+	{
+		Crypto.checkSession();
+
+		System.out.print("Ingrese PIN:");
+                String PIN = Crypto.readPin();
+                if(!APDU.verifyPIN(PIN)) throw new Exception("Pin incorrecto");
+
+		MessageDigest md = MessageDigest.getInstance("SHA-256");
+                String hash = APDU.byteArrayToHex(md.digest(PIN.getBytes()));
+
+                String sign =  APDU.sign(hash);
+
+		if(!Account.vincular(sign)) throw new Exception("Fallo en vinculacion");
+		System.out.println("Vinculacion OK");
+				
+	}
 	
 
 	private static void encrypt(String file) throws Exception
         {
                 Crypto.checkSession();
                 
+		System.out.println("AES ingrese un password para encriptar el archivo");
 		//solicito ingreso de password con confirmacion
 		String passwd=Crypto.confirmPassword();
 
@@ -293,8 +336,9 @@ class Crypto
         private static void decrypt(String file) throws Exception
         {
                 Crypto.checkSession();
+		System.out.println("AES ingrese un password para desencriptar el archivo");
 		//solicito ingreso de password con confirmacion
-                String passwd=Crypto.confirmPassword();
+                String passwd=Crypto.readPassword();
 
                 byte[] cryptodoc=Crypto.readFile(file);
 
@@ -347,7 +391,7 @@ class Crypto
 		return x509.getPublicKey();
 	}
 
-	 private static String readPin()
+	 private static String readPin() throws Exception
         {
                Console console = System.console();
                char[] pinChars = console.readPassword();
@@ -361,18 +405,22 @@ class Crypto
 		System.out.print("Password:");
                 String passwd= Crypto.readPin();
 
+		if(passwd.length()<6) throw new Exception("El password debe tener un largo minimo de 6 caracteres");
+		
                 System.out.print("Repetir Password:");
                 String passwd2= Crypto.readPin();
 
                 if(!passwd.equals(passwd2)) throw new Exception("Los passwords no coinciden");
 
+
 		return passwd; 
 	}
 
-	private static String readPassword()
+	private static String readPassword() throws Exception
 	{
 		System.out.print("Password:");
                 String passwd= Crypto.readPin();
+		if(passwd.length()<6) throw new Exception("El password debe tener un largo minimo de 6 caracteres");
 		
 		return passwd;
 	}

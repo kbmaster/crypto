@@ -7,6 +7,8 @@ import org.bouncycastle.asn1.x509.KeyPurposeId;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import java.math.BigInteger;
 
+import java.util.*;
+import java.io.*;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
@@ -114,6 +116,7 @@ class Keys
 
 	private static KeyStore load() throws Exception
 	{
+		Keys.loadConf();
 		KeyStore ks = KeyStore.getInstance("PKCS12");
 		
 		//tata de cargar el keystore
@@ -130,6 +133,13 @@ class Keys
 		}
 		
 		return ks;
+	}
+
+	private static void loadConf() throws Exception
+	{
+		 Properties p = new Properties();
+      		 p.load(new FileInputStream("crypto.ini"));
+		 Keys.__ksdir=p.getProperty("keystore");
 	}
 
 	private static X509Certificate  genX509(KeyPair keyPair) throws Exception
