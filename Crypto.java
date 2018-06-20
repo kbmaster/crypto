@@ -11,7 +11,6 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.MessageDigest;
 import java.security.cert.CertificateFactory;
-//import org.apache.commons.codec.binary.Base64;
 import javax.crypto.*;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
@@ -51,7 +50,7 @@ class Crypto
                                         break;
 		                        
 					case("-s"):
-                	                case("sign"):Crypto.sign(args[1],args[2]);
+                	                case("sign"):Crypto.sign(args[1]);
                         	        break;
 
 					case("-sci"):
@@ -59,7 +58,7 @@ class Crypto
                                         break;
 
                                 	case("-v"):
-	                                case("verify"):Crypto.verifyCI(args[1],args[2],args[3]);
+	                                case("verify"):Crypto.verify(args[1],args[2],args[3]);
 					break;
 
                 	                case("-e"):
@@ -70,10 +69,6 @@ class Crypto
         	                        case("decrypt"):Crypto.decrypt(args[1]);
 					break;
 
-					case("-crt"):
-					case("certificate"):Crypto.getCertificate();
-					break;
-	
         	                        case("-h"):
                 	                case("--help"):
                         	        default: Crypto.printHelp(); 
@@ -85,27 +80,30 @@ class Crypto
 
   	}
 
-	private static void printHelp() throws Exception
+	private static void printHelp()
   	{
-			System.out.println("Usage: java -jar crypt.jar [options][<files>]");
+			System.out.println("Usage: java -jar crypt.jar [opciones][<archivos>]");
                         System.out.println("Opptions:");
-                        System.out.println("-r, register        			register new user");
-                        System.out.println("-l, login           			user login");
-			System.out.println("-lci, loginci                               user login with ci");
-			System.out.println("-o, logout           			user logout");
-                        System.out.println("-s, sign  	<privatekey,document> 		sign the document");
-			System.out.println("-sci, signci<document>			sing the document with ci");
-                        System.out.println("-v, verify  <publickey,signature,document>	verify sign");
-                        System.out.println("-e, encrypt <document>			encript the document");
-                        System.out.println("-d, decrypt <document>			decrypt the document");
-			System.out.println("-crt, certificate 		                get the certificate");
+                        System.out.println("-r,register                                 registrar nuevo usuario");
+                        System.out.println("-l,login                                    login de usuario");
+			System.out.println("-lci,loginci                                login con cedula");
+			System.out.println("-o,logout                                   logout de usuario");
+                        
+			System.out.println("-s,sign     <documento>                     firma el documento");
+			System.out.println("-sci,signci <documento>                     firma el documento con cedula");
+                        System.out.println("-v,verify   <certificado,firma,documento>   verifica la firma");
+                        
+			System.out.println("-e,encrypt  <documento>                     encripta el documento");
+                        System.out.println("-d,decrypt  <documento>                     desencripta el documento");
   	}
 
 	
 
 	private static void register() throws Exception
 	{
-                Scanner inputScanner = new Scanner(System.in);
+                
+		System.out.println("Registro de usuario");
+		Scanner inputScanner = new Scanner(System.in);
                 System.out.print("Usuario: ");
                 String user=inputScanner.next();
 
@@ -118,7 +116,6 @@ class Crypto
 		if(!Account.register(user,passwd)) throw new Exception("Error en registro");
 		
 		String UID=Account.getID();
-		
 		Keys.genPKI(UID,passwd);
 		
 		System.out.println("Registro exitoso");
@@ -126,6 +123,7 @@ class Crypto
 
 	private static void logout() throws Exception
 	{
+		Crypto.checkSession();
 		if(!Account.logout()) throw new Exception("Error al finalizar sesion");
 		System.out.println("Sesion finalizada correctamente");
 	}	
@@ -133,6 +131,7 @@ class Crypto
 
 	private static void login() throws Exception 
 	{
+		System.out.println("Login de usuario");
 		Scanner inputScanner = new Scanner(System.in);
                 System.out.print("Usuario: ");
                 String user=inputScanner.next();
@@ -154,7 +153,7 @@ class Crypto
 		if(!APDU.verifyPIN(PIN)) throw new Exception("Pin incorrecto");
 
 		//init session
-		Account.sessionStart();
+		//Account.sessionStart();
 		System.out.println("Autenticacion completa");
 		
 	}
@@ -162,8 +161,6 @@ class Crypto
 	
 	private static void signCI(String file) throws Exception
 	{		
-		Crypto.checkSession();		
-
 		System.out.print("Ingrese PIN:");
 		String PIN = Crypto.readPin();
 		if(!APDU.verifyPIN(PIN)) throw new Exception("Pin incorrecto");
@@ -173,33 +170,47 @@ class Crypto
                 String hash = APDU.byteArrayToHex(md.digest(document));
 
 		String sign =  APDU.sign(hash);
+		String cert= APDU.getCertificate();
 		
-		String signame=file+".sgn";
+		String signame=file+".ci.sgn";
+		String certname=file+".ci.crt";
+
                 Crypto.saveFile(signame, APDU.hexStringToByteArray(sign));
+                Crypto.saveFile(certname,cert.getBytes());		
 
 		System.out.println("Firma "+signame+" generada exitosamente");
+		System.out.println("Certificado "+certname+"generado exitosamente");
 	}	
 
 
 
-	private  static void sign(String fileKey,String file) throws Exception
-	{
-		Crypto.checkSession();		
+	private  static void sign(String file) throws Exception
+        {
+                Crypto.checkSession();
 
-		PrivateKey privada=Crypto.getPrivateKey(fileKey);
-		byte[] document= Crypto.readFile(file);
+		String uid=Account.getID();
+		String password=readPassword();
 
-		Signature signature = Signature.getInstance("SHA256withRSA");
-		signature.initSign(privada);
-		signature.update(document);
-		
+                PrivateKey privada= Keys.getPrivate(uid,password);
+                byte[] document= Crypto.readFile(file);
+
+                Signature signature = Signature.getInstance("SHA256withRSA");
+                signature.initSign(privada);
+                signature.update(document);
+		X509Certificate cert = Keys.getCertificate(uid);
+                
 		String signame=file+".sgn";
+		String certname=file+".crt";
 
-		Crypto.saveFile(signame,signature.sign());		 	
-		System.out.println("Firma "+signame+" generada exitosamente");
-	}
-	
-	
+		Crypto.saveFile(signame,signature.sign());
+		Crypto.saveFile(certname,cert.getEncoded());
+
+                System.out.println("Firma "+signame+" generada exitosamente");
+		System.out.println("Certificado "+certname+"generado exitosamente");
+        }
+
+
+
 	private static void verifyCI(String fileKey, String fileSign, String file) throws Exception
 	{
                 Crypto.checkSession();
@@ -236,7 +247,6 @@ class Crypto
 
 	private static void verify(String fileKey, String fileSign, String file) throws Exception
 	{
-		Crypto.checkSession();		
 
 		PublicKey publica=Crypto.getPublicKey(fileKey);
 		byte[] document = Crypto.readFile(file);
@@ -247,9 +257,9 @@ class Crypto
 		sig.update(document);
 		
 		if(sig.verify(signature))
-		System.out.println("Verification OK");
+		System.out.println("Verificacion OK");
 		else
-		System.out.println("Verification Failed");
+		System.out.println("Fallo en verificacion");
 	}
 	
 
@@ -306,17 +316,6 @@ class Crypto
         }
 
 
-
-
-
-
-	private static void getCertificate() throws Exception
-	{
-		String cert= APDU.getCertificate();
-                Crypto.saveFile("Certificado.crt",cert.getBytes());		
-
-	}
-
 	//////////////////////////////////////////////////////////////////////
 
 	private static byte[] readFile(String filename) throws Exception
@@ -342,10 +341,10 @@ class Crypto
 
 	private static PublicKey getPublicKey(String filename) throws Exception
 	{
-                byte[] key = Crypto.readFile(filename);
-                X509EncodedKeySpec spec = new X509EncodedKeySpec(key);
-                KeyFactory kf = KeyFactory.getInstance("RSA");
-                return kf.generatePublic(spec);
+		FileInputStream cert = new FileInputStream(filename);
+		CertificateFactory f = CertificateFactory.getInstance("X.509");	
+		X509Certificate x509 = (X509Certificate) f.generateCertificate(cert);
+		return x509.getPublicKey();
 	}
 
 	 private static String readPin()
@@ -368,6 +367,14 @@ class Crypto
                 if(!passwd.equals(passwd2)) throw new Exception("Los passwords no coinciden");
 
 		return passwd; 
+	}
+
+	private static String readPassword()
+	{
+		System.out.print("Password:");
+                String passwd= Crypto.readPin();
+		
+		return passwd;
 	}
 
 

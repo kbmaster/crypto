@@ -68,11 +68,18 @@ class Keys
 	
 	static public PrivateKey getPrivate(String uid, String password) throws Exception
 	{
-		KeyStore ks = Keys.load();
-                KeyStore.ProtectionParameter entryPassword =  new KeyStore.PasswordProtection(password.toCharArray());
-                KeyStore.PrivateKeyEntry keyEntry = (KeyStore.PrivateKeyEntry) ks.getEntry("PRIV-"+uid,entryPassword);
+		try
+		{
+			KeyStore ks = Keys.load();
+                	KeyStore.ProtectionParameter entryPassword =  new KeyStore.PasswordProtection(password.toCharArray());
+	                KeyStore.PrivateKeyEntry keyEntry = (KeyStore.PrivateKeyEntry) ks.getEntry("PRIV-"+uid,entryPassword);
+	                return  keyEntry.getPrivateKey();				
+			
+		}catch (Exception e)
+		{
+			throw new Exception("Password invalido");
+		}
 
-                return  keyEntry.getPrivateKey();				
 	}
 
 	static public X509Certificate getCertificate(String uid) throws Exception

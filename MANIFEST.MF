@@ -1,2 +1,2 @@
 Main-Class: Main
-Class-Path: libs/bcprov-jdk15on-159.jar 
+Class-Path: libs/bcprov-jdk15on-159.jar libs/mysql-connector-java-5.1.46.jar
