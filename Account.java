@@ -225,7 +225,7 @@ class Account
 	public static boolean  owned(String passwd) throws Exception
 	{
 		System.out.println("Verificando password...");
-		String phash = Account.hashPass(passwd);
+		String phash = Account.hashPassSHA1(passwd);
 		String hash= phash.substring(0,5);
 		String suffixHash = phash.substring(5).toUpperCase();		
 		
@@ -254,7 +254,7 @@ class Account
 	} 
 
 
-	private static String hashPass( String pass) throws Exception
+	private static String hashPassSHA1( String pass) throws Exception
 	{
             MessageDigest md = MessageDigest.getInstance("SHA-1");
             byte[] array = md.digest(pass.getBytes());
@@ -266,6 +266,23 @@ class Account
             return sb.toString();
     
 	}
+
+	
+	 private static String hashPass( String pass) throws Exception
+        {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] array = md.digest(pass.getBytes());
+            StringBuffer sb = new StringBuffer();
+
+                for (int i = 0; i < array.length; ++i)
+                   sb.append(Integer.toHexString((array[i] & 0xFF) | 0x100).substring(1, 3));
+
+            return sb.toString();
+
+        }
+
+	
+
 
 	private static Connection getConnection() throws Exception
 	{
