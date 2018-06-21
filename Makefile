@@ -19,4 +19,4 @@ jar: *.class
 	$(JAR) cmvf MANIFEST.MF crypto.jar $^	
 
 clean:
-	rm -rf  *.jar *.class *~
+	rm -rf  *.class *~
